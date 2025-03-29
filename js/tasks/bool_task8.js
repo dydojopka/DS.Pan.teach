@@ -1,0 +1,179 @@
+import { initValidation, showToast, hideToast } from '../common.js';
+
+const BUILD_BUTTON_ID = 'buildButton';
+
+document.addEventListener('DOMContentLoaded', function() {    
+    // Добавляем обработчик события input
+    document.getElementById('vectorInput').addEventListener('input', function() {
+        updateInputDisplay();
+    });
+    
+    // Инициализация валидации
+    initValidation(
+        BUILD_BUTTON_ID,
+        validationCheck,
+        ['#vectorInput']
+    );
+    
+    // Добавляем обработчик для кнопки
+    document.getElementById(BUILD_BUTTON_ID).addEventListener('click', buildSDNF);
+});
+
+function formatWithSpaces(input) {
+    return input.replace(/(.{4})(?=.)/g, '$1 ');  // Вставляем пробел после каждого 4-го символа
+}
+
+function validateVector(vector) {
+    // Убираем все пробелы для проверки длины
+    const cleanVector = vector.replace(/\s/g, '');
+    const length = cleanVector.length;
+
+    // Проверяем, что длина является степенью двойки
+    if (length === 0 || (length & (length - 1)) !== 0) {
+        showError('Длина вектора должна быть степенью двойки');
+        return false;
+    }
+
+    return true;
+}
+
+function updateInputDisplay() {
+    const inputField = document.getElementById('vectorInput');
+    let inputValue = inputField.value.replace(/[^0-1]/g, '');  // Убираем все, кроме 0 и 1
+
+    // Форматируем значение с пробелами
+    const formattedValue = formatWithSpaces(inputValue);
+
+    // Сохраняем позицию курсора
+    const cursorPosition = inputField.selectionStart;
+
+    // Вставляем форматированное значение обратно в input
+    inputField.value = formattedValue;
+
+    // Восстанавливаем позицию курсора после обновления значения
+    const newPosition = cursorPosition + (formattedValue.length - inputValue.length);
+    inputField.setSelectionRange(newPosition, newPosition);
+}
+
+function showError(message) {
+    showToast(message);
+}
+
+function hideError() {
+    hideToast();
+}
+
+// Функция проверки условий валидации
+function validationCheck() {
+    const vectorInput = document.getElementById('vectorInput').value.replace(/\s+/g, '');
+    
+    // Проверка на пустой ввод
+    if (!vectorInput) {
+        return false;
+    }
+    
+    // Проверка на корректность символов
+    if (!/^[01]+$/.test(vectorInput)) {
+        showError('Вектор должен содержать только 0 и 1');
+        return false;
+    }
+    
+    // Проверка на степень двойки
+    const length = vectorInput.length;
+    if (length === 0 || (length & (length - 1)) !== 0) {
+        showError('Длина вектора должна быть степенью двойки');
+        return false;
+    }
+    
+    hideError();
+    return true;
+}
+
+function generateTable(vector) {
+    // Очищаем вектор от пробелов
+    const cleanVector = vector.replace(/\s/g, '');
+    
+    // Проверяем длину вектора
+    if (!validateVector(cleanVector)) {
+        return;
+    }
+    
+    const n = Math.log2(cleanVector.length); // количество переменных
+    const table = document.getElementById('tableContainer');
+    table.innerHTML = '';
+
+    // Создаем заголовок таблицы
+    const headerRow = table.insertRow();
+    
+    // Добавляем заголовки для переменных
+    for (let i = 1; i <= n; i++) {
+        const th = document.createElement('th');
+        th.textContent = `x${i}`;
+        headerRow.appendChild(th);
+    }
+    
+    // Добавляем заголовок для значения функции
+    const thF = document.createElement('th');
+    thF.textContent = 'f';
+    headerRow.appendChild(thF);
+
+    // Создаем тело таблицы
+    for (let i = 0; i < cleanVector.length; i++) {
+        const row = table.insertRow();
+        
+        // Преобразуем индекс в двоичное представление
+        const binary = i.toString(2).padStart(n, '0');
+        
+        // Добавляем значения переменных
+        for (let j = 0; j < n; j++) {
+            const td = row.insertCell();
+            td.textContent = binary[j];
+        }
+        
+        // Добавляем значение функции
+        const tdF = row.insertCell();
+        tdF.textContent = cleanVector[i];
+    }
+}
+
+function buildSDNFFormula(vector) {
+    const n = Math.log2(vector.length); // количество переменных
+    const terms = [];
+
+    for (let i = 0; i < vector.length; i++) {
+        if (vector[i] === '1') {
+            const binary = i.toString(2).padStart(n, '0');
+            const variables = [];
+            
+            for (let j = 0; j < n; j++) {
+                if (binary[j] === '0') {
+                    variables.push(`<mover><msub><mi>x</mi><mn>${j + 1}</mn></msub><mo stretchy="true" style="transform: scale(3, 1.2) translateX(-0.1em) translateY(-0.05em);">‾</mo></mover>`);
+                } else {
+                    variables.push(`<msub><mi>x</mi><mn>${j + 1}</mn></msub>`);
+                }
+            }
+            terms.push(`<mrow><mo>(</mo>${variables.join('<mo>∧</mo>')}<mo>)</mo></mrow>`);
+        }
+    }
+
+    return `<math>${terms.join('<mo>∨</mo>')}</math>`;
+}
+
+function buildSDNF() {
+    hideError();
+    const vectorInput = document.getElementById('vectorInput').value;
+    
+    if (!validateVector(vectorInput)) {
+        return;
+    }
+
+    // Очищаем вектор от пробелов
+    const cleanVector = vectorInput.replace(/\s/g, '');
+
+    // Строим таблицу истинности
+    generateTable(cleanVector);
+
+    // Строим и отображаем СДНФ
+    const sdnfFormula = buildSDNFFormula(cleanVector);
+    document.getElementById('sdnfFormula').innerHTML = sdnfFormula;
+}
